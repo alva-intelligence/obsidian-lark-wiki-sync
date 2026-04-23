@@ -1,4 +1,5 @@
 import { Plugin, Notice } from 'obsidian';
+import { execFile } from 'child_process';
 import { PluginSettings, SpaceConfig } from './types';
 import { LarkCli } from './lark-cli';
 import { PullEngine } from './pull';
@@ -72,7 +73,15 @@ export default class LarkWikiSyncPlugin extends Plugin {
           }
         }
         totalConflicts += result.conflicts.length;
-        new Notice(`✓ "${space.spaceName}": ${result.written} updated, ${result.skipped} unchanged${result.conflicts.length ? `, ${result.conflicts.length} conflicts` : ''}`);
+        const msg = `✓ "${space.spaceName}": ${result.written} updated, ${result.skipped} unchanged${result.conflicts.length ? `, ${result.conflicts.length} conflicts` : ''}`;
+        new Notice(msg, 8000);
+        if (result.written > 0) {
+          const n = new Notice(`Open "${space.spaceName}" vault in Obsidian? Click here.`, 0);
+          (n as any).noticeEl?.addEventListener('click', () => {
+            execFile('open', ['-a', 'Obsidian', space.vaultPath], () => {});
+            n.hide();
+          });
+        }
       } catch (e: any) {
         new Notice(`⚠ Error syncing "${space.spaceName}": ${e.message}`);
       }
