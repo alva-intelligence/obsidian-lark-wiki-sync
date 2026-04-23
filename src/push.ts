@@ -29,7 +29,7 @@ export class PushEngine {
       const revision = await this.cli.getDocRevision(objToken);
       if (state) {
         const localMtime = new Date(statSync(absFilePath).mtime).toISOString();
-        state.nodes[nodeToken] = { path: relPath, objToken, larkLastModified: new Date().toISOString(), localLastModified: localMtime, larkRevisionId: revision };
+        state.nodes[nodeToken] = { path: relPath, objToken, larkLastModified: '', localLastModified: localMtime, larkRevisionId: revision };
         StateManager.write(vaultPath, state);
       }
       return { status: 'created' };

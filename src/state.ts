@@ -8,7 +8,12 @@ export class StateManager {
   static read(vaultPath: string): SyncState | null {
     const p = join(vaultPath, STATE_FILE);
     if (!existsSync(p)) return null;
-    return JSON.parse(readFileSync(p, 'utf-8')) as SyncState;
+    try {
+      return JSON.parse(readFileSync(p, 'utf-8')) as SyncState;
+    } catch {
+      console.warn(`LarkWikiSync: corrupt state file at ${p}, starting fresh`);
+      return null;
+    }
   }
 
   static write(vaultPath: string, state: SyncState): void {

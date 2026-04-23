@@ -66,7 +66,11 @@ export default class LarkWikiSyncPlugin extends Plugin {
       try {
         new Notice(`Syncing "${space.spaceName}"...`);
         const result = await engine.pullSpace(space);
-        this.settings.conflicts.push(...result.conflicts);
+        for (const c of result.conflicts) {
+          if (!this.settings.conflicts.find(x => x.nodeToken === c.nodeToken)) {
+            this.settings.conflicts.push(c);
+          }
+        }
         totalConflicts += result.conflicts.length;
         new Notice(`✓ "${space.spaceName}": ${result.written} updated, ${result.skipped} unchanged${result.conflicts.length ? `, ${result.conflicts.length} conflicts` : ''}`);
       } catch (e: any) {

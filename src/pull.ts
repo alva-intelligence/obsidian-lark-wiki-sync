@@ -1,5 +1,5 @@
 import { mkdirSync, writeFileSync, existsSync, statSync, readFileSync, appendFileSync } from 'fs';
-import { join, dirname } from 'path';
+import { join, dirname, resolve } from 'path';
 import { LarkCli } from './lark-cli';
 import { StateManager } from './state';
 import { SpaceConfig, SyncState, Conflict, LarkNode, PluginSettings } from './types';
@@ -21,10 +21,13 @@ export class PullEngine {
     const state = StateManager.read(config.vaultPath)
       ?? StateManager.fresh(config.spaceId, config.spaceName);
     const result: PullResult = { written: 0, skipped: 0, conflicts: [] };
-    await this.walkNodes(config.spaceId, '', '', config.vaultPath, state, result);
-    state.lastSync = new Date().toISOString();
-    StateManager.write(config.vaultPath, state);
-    this.ensureGitignore(config.vaultPath);
+    try {
+      await this.walkNodes(config.spaceId, '', '', config.vaultPath, state, result);
+    } finally {
+      state.lastSync = new Date().toISOString();
+      StateManager.write(config.vaultPath, state);
+      this.ensureGitignore(config.vaultPath);
+    }
     return result;
   }
 
@@ -51,6 +54,10 @@ export class PullEngine {
       }
       const relPath = this.resolveRelPath(node, parentRelDir);
       const absPath = join(vaultPath, relPath);
+      if (!resolve(absPath).startsWith(resolve(vaultPath) + '/')) {
+        result.skipped++;
+        continue;
+      }
       if (existing && existsSync(absPath)) {
         const localMtime = new Date(statSync(absPath).mtime).toISOString();
         if (PullEngine.detectConflict(larkModified, existing.localLastModified, localMtime)) {
@@ -93,8 +100,9 @@ export class PullEngine {
   }
 
   static detectConflict(larkLastModified: string, stateLocalLastModified: string, actualLocalMtime: string): boolean {
-    const larkChanged = new Date(larkLastModified) > new Date(stateLocalLastModified);
-    const localChanged = new Date(actualLocalMtime) > new Date(stateLocalLastModified);
+    const truncSec = (iso: string) => Math.floor(new Date(iso).getTime() / 1000);
+    const larkChanged = truncSec(larkLastModified) > truncSec(stateLocalLastModified);
+    const localChanged = truncSec(actualLocalMtime) > truncSec(stateLocalLastModified);
     return larkChanged && localChanged;
   }
 }

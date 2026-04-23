@@ -74,11 +74,18 @@ export class LarkCli {
   }
 
   openTerminalForLogin(): void {
+    // Validate cliPath only contains safe characters before embedding in AppleScript
+    if (!/^[a-zA-Z0-9/_.-]+$/.test(this.cliPath)) {
+      console.error('LarkCli: unsafe cliPath, refusing to open terminal');
+      return;
+    }
     const { execFile: ef } = require('child_process');
-    ef('open', ['-a', 'Terminal'], () => {});
     setTimeout(() => {
-      ef('osascript', ['-e', `tell application "Terminal" to do script "${this.cliPath} login"`], () => {});
-    }, 500);
+      ef('osascript', [
+        '-e',
+        `tell application "Terminal" to do script "${this.cliPath} login"`
+      ], () => {});
+    }, 100);
   }
 }
 
