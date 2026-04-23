@@ -52,9 +52,11 @@ export default class LarkWikiSyncPlugin extends Plugin {
     const msgs: Record<string, string> = {
       idle: `Lark ✓ synced ${formatTime(new Date())}`,
       syncing: 'Lark ⟳ syncing...',
-      conflict: `Lark ⚠ ${this.settings.conflicts.length} conflict(s)`
+      conflict: `Lark ⚠ ${this.settings.conflicts.length} conflict(s) — click to resolve`
     };
     this.statusBar.setText(msgs[state]);
+    this.statusBar.style.cursor = state === 'conflict' ? 'pointer' : '';
+    this.statusBar.onclick = state === 'conflict' ? () => this.openConflictList() : null;
   }
 
   async syncAll(): Promise<void> {
@@ -92,7 +94,8 @@ export default class LarkWikiSyncPlugin extends Plugin {
     await this.saveSettings();
     this.updateStatusBar(totalConflicts > 0 ? 'conflict' : 'idle');
     if (totalConflicts > 0) {
-      new Notice(`⚠ ${totalConflicts} conflict(s) need your attention. Use "Lark: Resolve conflicts".`);
+      const cn = new Notice(`⚠ ${totalConflicts} conflict(s) — click here to resolve`, 0);
+      (cn as any).noticeEl?.addEventListener('click', () => { this.openConflictList(); cn.hide(); });
     }
   }
 
@@ -155,13 +158,10 @@ export default class LarkWikiSyncPlugin extends Plugin {
         }
       }
 
-      // Obsidian reads obsidian.json only at startup — restart so the new vault
-      // entry is visible, then open via URI.
-      execFile('osascript', ['-e', 'tell application "Obsidian" to quit'], () => {
-        setTimeout(() => {
-          execFile('open', [`obsidian://open?vault=${encodeURIComponent(spaceName)}`], () => {});
-        }, 3000);
-      });
+      // Obsidian reads obsidian.json only at startup — quit then reopen via shell
+      // sleep so the process is fully gone before we send the URI.
+      const uri = `obsidian://open?vault=${encodeURIComponent(spaceName)}`;
+      execFile('/bin/sh', ['-c', `osascript -e 'tell application "Obsidian" to quit' && sleep 4 && open "${uri}"`], () => {});
     } catch (e: any) {
       new Notice(`Could not open vault: ${e.message}`);
     }

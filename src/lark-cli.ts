@@ -1,5 +1,6 @@
 import { execFile } from 'child_process';
 import { LarkSpace, LarkNode } from './types';
+import { blocksToMarkdown, LarkBlock } from './blocks-to-markdown';
 
 export class LarkCli {
   constructor(private cliPath: string) {}
@@ -51,8 +52,15 @@ export class LarkCli {
   }
 
   async getDocContent(objToken: string): Promise<string> {
-    const res = await this.run(['api', 'GET', `/open-apis/docx/v1/documents/${objToken}/raw_content`]) as any;
-    return res.data?.content ?? '';
+    const blocks: LarkBlock[] = [];
+    let pageToken = '';
+    do {
+      const qs = `document_revision_id=-1${pageToken ? `&page_token=${pageToken}` : ''}`;
+      const res = await this.run(['api', 'GET', `/open-apis/docx/v1/documents/${objToken}/blocks?${qs}`]) as any;
+      blocks.push(...(res.data?.items ?? []));
+      pageToken = res.data?.has_more ? res.data.page_token : '';
+    } while (pageToken);
+    return blocksToMarkdown(blocks);
   }
 
   async getDocRevision(objToken: string): Promise<number> {
