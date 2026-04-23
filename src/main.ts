@@ -158,7 +158,13 @@ export function registerAndOpenVault(vaultPath: string, vaultName: string): void
       }
     }
 
-    execFile('open', [`obsidian://open?vault=${encodeURIComponent(vaultName)}`], () => {});
+    // Obsidian reads obsidian.json only at startup, so we must restart it for
+    // the new registry entry to take effect.
+    execFile('osascript', ['-e', 'tell application "Obsidian" to quit'], () => {
+      setTimeout(() => {
+        execFile('open', [`obsidian://open?vault=${encodeURIComponent(vaultName)}`], () => {});
+      }, 1500);
+    });
   } catch (_) {}
 }
 
