@@ -11,6 +11,12 @@
     "testEnvironment": "node",
     "moduleNameMapper": {
       "^obsidian$": "<rootDir>/src/__mocks__/obsidian.ts"
+    },
+    "transform": {
+      "^.+\\.tsx?$": ["ts-jest", {
+        "tsconfig": "tsconfig.test.json",
+        "diagnostics": false
+      }]
     }
   },
   "devDependencies": {
