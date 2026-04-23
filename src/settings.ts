@@ -1,6 +1,5 @@
 import { App, PluginSettingTab, Setting } from 'obsidian';
 import type LarkWikiSyncPlugin from './main';
-import { registerAndOpenVault } from './main';
 import { WizardModal } from './wizard/wizard-modal';
 
 export class LarkSyncSettingsTab extends PluginSettingTab {
@@ -48,7 +47,7 @@ export class LarkSyncSettingsTab extends PluginSettingTab {
         .addButton(btn => btn
           .setButtonText('Open vault')
           .setCta()
-          .onClick(() => registerAndOpenVault(space.vaultPath, space.spaceName))
+          .onClick(() => this.plugin.openVault(space))
         )
         .addButton(btn => btn
           .setButtonText('Remove')
@@ -63,8 +62,23 @@ export class LarkSyncSettingsTab extends PluginSettingTab {
     containerEl.createEl('br');
 
     new Setting(containerEl)
+      .setName('Add space')
+      .setDesc('Sync another Lark Wiki space to a new vault')
+      .addButton(btn => btn
+        .setButtonText('Add space')
+        .setCta()
+        .onClick(() => {
+          new WizardModal(this.app, this.plugin.settings, async (s) => {
+            Object.assign(this.plugin.settings, s);
+            await this.plugin.saveSettings();
+            this.display();
+          }).open();
+        })
+      );
+
+    new Setting(containerEl)
       .setName('Re-run setup wizard')
-      .setDesc('Add more spaces or reconfigure authentication')
+      .setDesc('Reconfigure CLI path, authentication, or all spaces')
       .addButton(btn => btn
         .setButtonText('Open wizard')
         .onClick(() => {

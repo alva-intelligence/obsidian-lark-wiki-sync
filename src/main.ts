@@ -81,7 +81,7 @@ export default class LarkWikiSyncPlugin extends Plugin {
         if (result.written > 0) {
           const n = new Notice(`Open "${space.spaceName}" vault in Obsidian? Click here.`, 0);
           (n as any).noticeEl?.addEventListener('click', () => {
-            registerAndOpenVault(space.vaultPath, space.spaceName);
+            this.openVault(space);
             n.hide();
           });
         }
@@ -132,6 +132,81 @@ export default class LarkWikiSyncPlugin extends Plugin {
     return this.settings.spaces.find(s => absPath.startsWith(s.vaultPath)) ?? null;
   }
 
+  openVault(space: SpaceConfig): void {
+    const { vaultPath, spaceName } = space;
+    try {
+      // Ensure .obsidian dir exists
+      const obsidianDir = path.join(vaultPath, '.obsidian');
+      if (!fs.existsSync(obsidianDir)) fs.mkdirSync(obsidianDir, { recursive: true });
+
+      // Auto-install this plugin into the new vault
+      this.installPluginInVault(obsidianDir, space);
+
+      // Register vault in Obsidian's global registry
+      const registryPath = path.join(os.homedir(), 'Library', 'Application Support', 'obsidian', 'obsidian.json');
+      if (fs.existsSync(registryPath)) {
+        const registry = JSON.parse(fs.readFileSync(registryPath, 'utf8'));
+        const alreadyRegistered = Object.values(registry.vaults ?? {}).some((v: any) => v.path === vaultPath);
+        if (!alreadyRegistered) {
+          const id = Math.random().toString(16).slice(2).padEnd(16, '0');
+          registry.vaults = registry.vaults ?? {};
+          registry.vaults[id] = { path: vaultPath, ts: Date.now() };
+          fs.writeFileSync(registryPath, JSON.stringify(registry, null, '\t'));
+        }
+      }
+
+      // Obsidian reads obsidian.json only at startup — restart so the new vault
+      // entry is visible, then open via URI.
+      execFile('osascript', ['-e', 'tell application "Obsidian" to quit'], () => {
+        setTimeout(() => {
+          execFile('open', [`obsidian://open?vault=${encodeURIComponent(spaceName)}`], () => {});
+        }, 3000);
+      });
+    } catch (e: any) {
+      new Notice(`Could not open vault: ${e.message}`);
+    }
+  }
+
+  private installPluginInVault(obsidianDir: string, space: SpaceConfig): void {
+    const pluginId = this.manifest.id;
+    const srcBase = path.join(
+      (this.app.vault.adapter as any).getBasePath(),
+      this.app.vault.configDir,
+      'plugins',
+      pluginId
+    );
+    const dstPluginDir = path.join(obsidianDir, 'plugins', pluginId);
+    fs.mkdirSync(dstPluginDir, { recursive: true });
+
+    // Copy plugin files
+    for (const file of ['main.js', 'manifest.json', 'styles.css']) {
+      const src = path.join(srcBase, file);
+      if (fs.existsSync(src)) fs.copyFileSync(src, path.join(dstPluginDir, file));
+    }
+
+    // Enable the plugin in this vault
+    const communityPluginsPath = path.join(obsidianDir, 'community-plugins.json');
+    let enabled: string[] = [];
+    if (fs.existsSync(communityPluginsPath)) {
+      try { enabled = JSON.parse(fs.readFileSync(communityPluginsPath, 'utf8')); } catch (_) {}
+    }
+    if (!enabled.includes(pluginId)) {
+      enabled.push(pluginId);
+      fs.writeFileSync(communityPluginsPath, JSON.stringify(enabled));
+    }
+
+    // Pre-configure plugin with this space so wizard doesn't re-run
+    const dataPath = path.join(dstPluginDir, 'data.json');
+    const data: PluginSettings = {
+      larkCliPath: this.settings.larkCliPath,
+      syncAiSkills: this.settings.syncAiSkills,
+      spaces: [space],
+      wizardCompleted: true,
+      conflicts: []
+    };
+    fs.writeFileSync(dataPath, JSON.stringify(data, null, '\t'));
+  }
+
   async loadSettings(): Promise<void> {
     this.settings = Object.assign({}, DEFAULT_SETTINGS, await this.loadData());
   }
@@ -139,33 +214,6 @@ export default class LarkWikiSyncPlugin extends Plugin {
   async saveSettings(): Promise<void> {
     await this.saveData(this.settings);
   }
-}
-
-export function registerAndOpenVault(vaultPath: string, vaultName: string): void {
-  try {
-    const obsidianDir = path.join(vaultPath, '.obsidian');
-    if (!fs.existsSync(obsidianDir)) fs.mkdirSync(obsidianDir, { recursive: true });
-
-    const registryPath = path.join(os.homedir(), 'Library', 'Application Support', 'obsidian', 'obsidian.json');
-    if (fs.existsSync(registryPath)) {
-      const registry = JSON.parse(fs.readFileSync(registryPath, 'utf8'));
-      const alreadyRegistered = Object.values(registry.vaults ?? {}).some((v: any) => v.path === vaultPath);
-      if (!alreadyRegistered) {
-        const id = Math.random().toString(16).slice(2).padEnd(16, '0');
-        registry.vaults = registry.vaults ?? {};
-        registry.vaults[id] = { path: vaultPath, ts: Date.now() };
-        fs.writeFileSync(registryPath, JSON.stringify(registry, null, '\t'));
-      }
-    }
-
-    // Obsidian reads obsidian.json only at startup, so we must restart it for
-    // the new registry entry to take effect.
-    execFile('osascript', ['-e', 'tell application "Obsidian" to quit'], () => {
-      setTimeout(() => {
-        execFile('open', [`obsidian://open?vault=${encodeURIComponent(vaultName)}`], () => {});
-      }, 1500);
-    });
-  } catch (_) {}
 }
 
 function formatTime(d: Date): string {
