@@ -1,0 +1,10 @@
+{
+  "id": "lark-wiki-sync",
+  "name": "Lark Wiki Sync",
+  "version": "1.0.0",
+  "minAppVersion": "1.4.0",
+  "description": "Sync Lark Wiki spaces to local Obsidian vaults",
+  "author": "Maleo",
+  "authorUrl": "",
+  "isDesktopOnly": true
+}

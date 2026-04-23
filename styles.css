@@ -1,0 +1,6 @@
+/* Lark Wiki Sync styles */
+.lark-wizard-step { padding: 16px 0; }
+.lark-status-ok { color: var(--color-green); }
+.lark-status-error { color: var(--color-red); }
+.lark-space-item { display: flex; align-items: center; gap: 8px; margin: 8px 0; }
+.lark-conflict-path { font-family: monospace; font-size: 0.85em; color: var(--text-muted); }
