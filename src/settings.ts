@@ -1,11 +1,7 @@
 import { App, PluginSettingTab, Setting } from 'obsidian';
-import { execFile } from 'child_process';
 import type LarkWikiSyncPlugin from './main';
+import { registerAndOpenVault } from './main';
 import { WizardModal } from './wizard/wizard-modal';
-
-function openVaultInObsidian(vaultPath: string): void {
-  execFile('open', ['-a', 'Obsidian', vaultPath], () => {});
-}
 
 export class LarkSyncSettingsTab extends PluginSettingTab {
   constructor(app: App, private plugin: LarkWikiSyncPlugin) {
@@ -52,7 +48,7 @@ export class LarkSyncSettingsTab extends PluginSettingTab {
         .addButton(btn => btn
           .setButtonText('Open vault')
           .setCta()
-          .onClick(() => openVaultInObsidian(space.vaultPath))
+          .onClick(() => registerAndOpenVault(space.vaultPath, space.spaceName))
         )
         .addButton(btn => btn
           .setButtonText('Remove')

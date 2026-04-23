@@ -1,5 +1,8 @@
 import { Plugin, Notice } from 'obsidian';
 import { execFile } from 'child_process';
+import * as fs from 'fs';
+import * as path from 'path';
+import * as os from 'os';
 import { PluginSettings, SpaceConfig } from './types';
 import { LarkCli } from './lark-cli';
 import { PullEngine } from './pull';
@@ -78,7 +81,7 @@ export default class LarkWikiSyncPlugin extends Plugin {
         if (result.written > 0) {
           const n = new Notice(`Open "${space.spaceName}" vault in Obsidian? Click here.`, 0);
           (n as any).noticeEl?.addEventListener('click', () => {
-            execFile('open', ['-a', 'Obsidian', space.vaultPath], () => {});
+            registerAndOpenVault(space.vaultPath, space.spaceName);
             n.hide();
           });
         }
@@ -136,6 +139,27 @@ export default class LarkWikiSyncPlugin extends Plugin {
   async saveSettings(): Promise<void> {
     await this.saveData(this.settings);
   }
+}
+
+export function registerAndOpenVault(vaultPath: string, vaultName: string): void {
+  try {
+    const obsidianDir = path.join(vaultPath, '.obsidian');
+    if (!fs.existsSync(obsidianDir)) fs.mkdirSync(obsidianDir, { recursive: true });
+
+    const registryPath = path.join(os.homedir(), 'Library', 'Application Support', 'obsidian', 'obsidian.json');
+    if (fs.existsSync(registryPath)) {
+      const registry = JSON.parse(fs.readFileSync(registryPath, 'utf8'));
+      const alreadyRegistered = Object.values(registry.vaults ?? {}).some((v: any) => v.path === vaultPath);
+      if (!alreadyRegistered) {
+        const id = Math.random().toString(16).slice(2).padEnd(16, '0');
+        registry.vaults = registry.vaults ?? {};
+        registry.vaults[id] = { path: vaultPath, ts: Date.now() };
+        fs.writeFileSync(registryPath, JSON.stringify(registry, null, '\t'));
+      }
+    }
+
+    execFile('open', [`obsidian://open?vault=${encodeURIComponent(vaultName)}`], () => {});
+  } catch (_) {}
 }
 
 function formatTime(d: Date): string {
